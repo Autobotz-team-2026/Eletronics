@@ -1,0 +1,78 @@
+#include <TMCStepper.h>
+
+// Definição dos pinos do ESP32-S3
+#define RX_PIN 18 
+#define TX_PIN 17 
+
+#define SERIAL_PORT Serial1 
+#define R_SENSE 0.11f       
+
+// --- ENDEREÇOS DOS DRIVERS ---
+// O endereço é definido pelos pinos físicos MS1 e MS2 no driver
+#define ENDERECO_MOTOR_0 0b00 // MS1 = Baixo, MS2 = Baixo
+#define ENDERECO_MOTOR_1 0b01 // MS1 = Alto,  MS2 = Baixo
+
+// Instanciando os dois objetos apontando para a mesma porta serial, 
+// mas com endereços diferentes!
+TMC2209Stepper driver0(&SERIAL_PORT, R_SENSE, ENDERECO_MOTOR_0);
+TMC2209Stepper driver1(&SERIAL_PORT, R_SENSE, ENDERECO_MOTOR_1);
+
+void setup() {
+  Serial.begin(115200);
+  while (!Serial); 
+  driver0.pdn_disable(1); // comando para o Driver não considerar MS1 e MS2 como microstepping e sim como endereço. 
+  driver1.pdn_disable(1);
+  delay(2000); 
+  Serial.println("\n--- Teste UART: Multiplos TMC2209 ---");
+
+  // Inicia a porta serial física do ESP32 apenas uma vez
+  SERIAL_PORT.begin(115200, SERIAL_8N1, RX_PIN, TX_PIN);
+
+  // Inicializa os registradores de ambos os objetos
+  driver0.begin(); 
+  driver1.begin();
+
+  // ==========================================
+  // TESTE DO MOTOR 0
+  // ==========================================
+  Serial.println("\n[1/2] Verificando Motor 0 (Endereco 0x00)...");
+  uint8_t result0 = driver0.test_connection();
+
+  if (result0 == 0) {
+    Serial.println("✅ SUCESSO: Motor 0 encontrado!");
+    Serial.print("   Versao do Chip: 0x");
+    Serial.println(driver0.version(), HEX);
+  } else {
+    Serial.println("❌ FALHA: Motor 0 nao respondeu.");
+    Serial.print("   Codigo de erro: ");
+    Serial.println(result0);
+  }
+
+  // ==========================================
+  // TESTE DO MOTOR 1
+  // ==========================================
+  Serial.println("\n[2/2] Verificando Motor 1 (Endereco 0x01)...");
+  uint8_t result1 = driver1.test_connection();
+
+  if (result1 == 0) {
+    Serial.println("✅ SUCESSO: Motor 1 encontrado!");
+    Serial.print("   Versao do Chip: 0x");
+    Serial.println(driver1.version(), HEX);
+  } else {
+    Serial.println("❌ FALHA: Motor 1 nao respondeu.");
+    Serial.print("   Codigo de erro: ");
+    Serial.println(result1);
+    
+    // Dica específica para o segundo motor
+    if (result0 == 0) {
+      Serial.println("   DICA: Como o Motor 0 funcionou, a fiacao principal esta correta.");
+      Serial.println("   Verifique se voce colocou o MS1 do Motor 1 em HIGH (3.3V/5V)!");
+    }
+  }
+  
+  Serial.println("\n--- Fim do Teste ---");
+}
+
+void loop() {
+  // Vazio
+}
