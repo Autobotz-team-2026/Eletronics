@@ -7,6 +7,8 @@
 - Isola logs de debug na porta UART (Serial0) independente do ROS.
 - Implementa Watchdog de 500ms atrelado ao callback de recebimento de pacotes.
 - Requer compilação com 'USB CDC On Boot: Enabled'.
+
+- Obs: se 'USB CDC On Boot: Disabled' os dois "prints" vão para o mesmo canal USB.
 ------------------------------------------------------------------------------------
 */
 
