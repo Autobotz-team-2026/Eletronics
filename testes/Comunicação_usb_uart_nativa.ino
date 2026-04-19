@@ -1,3 +1,16 @@
+/*
+------------------------------------------------------------------------------------
+  feat: implementa arquitetura Dual-Core com FreeRTOS e isolamento de portas
+
+- Separa micro-ROS no Core 0 usando USB Nativa (latência ultrabaixa).
+- Move controle de motores e PWM para o Core 1.
+- Isola logs de debug na porta UART (Serial0) independente do ROS.
+- Implementa Watchdog de 500ms atrelado ao callback de recebimento de pacotes.
+- Requer compilação com 'USB CDC On Boot: Enabled'.
+------------------------------------------------------------------------------------
+*/
+
+
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
 
