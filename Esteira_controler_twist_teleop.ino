@@ -233,41 +233,63 @@ const char* html_page = R"rawliteral(
     </html>
     )rawliteral";
 
-  void Task_WebServer(void *pvParameters) {
-    WiFi.softAP("Robo_Esteira", "12345678");
-    IPAddress IP = WiFi.softAPIP();
-    Serial0.print(">> [WEB] Wi-Fi Iniciado! Conecte no IP: ");
-    Serial0.println(IP);
+  // ==========================================
+// TAREFA 2: Servidor Web Wi-Fi (Core 0)
+// ==========================================
+// ... (mantenha a variável 'server' e a 'html_page' exatamente como estão no seu código) ...
 
-    server.on("/", HTTP_GET, []() {
-      server.send(200, "text/html", html_page);
-    });
+void Task_WebServer(void *pvParameters) {
+  // 1. Configura como "Estação" (Cliente) e conecta na sua rede
+  WiFi.mode(WIFI_STA);
+  WiFi.begin("LucianoCL", "calculosola");
+  
+  Serial0.print(">> [WEB] Conectando ao Wi-Fi LucianoCL...");
 
-    server.on("/acao", HTTP_GET, []() {
-      String dir = server.arg("dir");
-      float speed = server.arg("v").toFloat();
-
-      float target_v = 0.0, target_w = 0.0;
-      if (dir == "F") target_v = speed;
-      else if (dir == "B") target_v = -speed;
-      else if (dir == "L") target_w = speed;
-      else if (dir == "R") target_w = -speed;
-
-      if (xSemaphoreTake(xMutexData, pdMS_TO_TICKS(5)) == pdTRUE) {
-        sharedCmd.v = target_v;
-        sharedCmd.w = target_w;
-        sharedCmd.last_update = millis();
-        xSemaphoreGive(xMutexData);
-      }
-      server.send(200, "text/plain", "OK");
-    });
-
-    server.begin();
-    while (1) {
-      server.handleClient();
-      vTaskDelay(pdMS_TO_TICKS(20));
-    }
+  // Fica em loop esperando conectar (o vTaskDelay impede que o núcleo trave)
+  while (WiFi.status() != WL_CONNECTED) {
+    vTaskDelay(pdMS_TO_TICKS(500));
+    Serial0.print(".");
   }
+
+  Serial0.println();
+  
+  // Imprime o IP que o seu roteador emprestou para o robô
+  IPAddress IP = WiFi.localIP();
+  Serial0.print(">> [WEB] Conectado com sucesso! Acesse no celular: http://");
+  Serial0.println(IP);
+
+  // 2. Configura a página inicial (HTML)
+  server.on("/", HTTP_GET, []() {
+    server.send(200, "text/html", html_page);
+  });
+
+  // 3. Recebe as ordens de movimento
+  server.on("/acao", HTTP_GET, []() {
+    String dir = server.arg("dir");
+    float speed = server.arg("v").toFloat();
+
+    float target_v = 0.0, target_w = 0.0;
+    if (dir == "F") target_v = speed;
+    else if (dir == "B") target_v = -speed;
+    else if (dir == "L") target_w = speed;
+    else if (dir == "R") target_w = -speed;
+
+    if (xSemaphoreTake(xMutexData, pdMS_TO_TICKS(5)) == pdTRUE) {
+      sharedCmd.v = target_v;
+      sharedCmd.w = target_w;
+      sharedCmd.last_update = millis();
+      xSemaphoreGive(xMutexData);
+    }
+    server.send(200, "text/plain", "OK");
+  });
+
+  // 4. Inicia o servidor e entra no loop
+  server.begin();
+  while (1) {
+    server.handleClient();
+    vTaskDelay(pdMS_TO_TICKS(20));
+  }
+}
 
   // ==========================================
   // TAREFA 3: Comunicação micro-ROS (Core 0 / Nativa)
