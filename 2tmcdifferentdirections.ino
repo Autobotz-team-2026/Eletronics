@@ -16,7 +16,7 @@
   de STEP e DIREÇÃO via uart para cada driver individualmente, 
   sem utilizar os pinos STEP e DIR do motor e, mais importante, 
   sem ser necessário uma biblioteca como a AccelStepper.
-*/=============================================================
+=============================================================*/
 
 
 // Instanciando os dois drivers
