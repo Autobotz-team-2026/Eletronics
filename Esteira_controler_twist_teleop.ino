@@ -7,6 +7,7 @@
 #include <geometry_msgs/msg/twist.h>
 #include <freertos/FreeRTOS.h>
 #include <freertos/task.h>
+
 #include <freertos/semphr.h>
 #include <WiFi.h>
 #include <WebServer.h>
@@ -14,23 +15,23 @@
 // ==========================================
 // CONFIGURAÇÕES GERAIS E PINOS
 // ==========================================
-#define LED_PIN 97 
+#define LED_PIN 97
 
 // Pinos Motor 1 (Esquerda) e Motor 2 (Direita)
 #define INA_M1 7
 #define INB_M1 15
 #define EN_M1 16
-#define INA_M2 18 
-#define INB_M2 19
-#define EN_M2 21
+#define INA_M2 5
+#define INB_M2 6
+#define EN_M2 4
 
 // Parâmetros Físicos e PWM
-const float WHEEL_BASE = 0.25; 
-const float MAX_SPEED = 1.0;   
-const uint32_t PWM_FREQ = 2000; 
-const uint8_t PWM_RES = 11;     
-const float MAX_PWM = 2047.0;   
-const float MIN_PWM = 480.0;    
+const float WHEEL_BASE = 0.2125; //metros
+const float MAX_SPEED = 0.3;
+const uint32_t PWM_FREQ = 2000;
+const uint8_t PWM_RES = 11;
+const float MAX_PWM = 1605.0;
+const float MIN_PWM = 480.0;
 const unsigned long WATCHDOG_TIMEOUT_MS = 500;
 
 // Matriz de Calibração dos Motores
@@ -68,7 +69,7 @@ void error_loop(){
   while(1){
     digitalWrite(LED_PIN, !digitalRead(LED_PIN));
     Serial0.println("[ERRO ROS] Falha critica no micro-ROS. Reinicie a placa.");
-    vTaskDelay(pdMS_TO_TICKS(500)); 
+    vTaskDelay(pdMS_TO_TICKS(500));
   }
 }
 
@@ -84,12 +85,12 @@ int calculate_pwm_with_deadband(float target_velocity) {
 // ==========================================
 void subscription_callback(const void *msgin) {
   const geometry_msgs__msg__Twist * m = (const geometry_msgs__msg__Twist *)msgin;
-  
+
   if (xSemaphoreTake(xMutexData, pdMS_TO_TICKS(5)) == pdTRUE) {
     sharedCmd.v = m->linear.x;
     sharedCmd.w = m->angular.z;
-    sharedCmd.last_update = millis(); 
-    xSemaphoreGive(xMutexData); 
+    sharedCmd.last_update = millis();
+    xSemaphoreGive(xMutexData);
   }
 }
 
@@ -103,10 +104,10 @@ void Task_Control(void *pvParameters) {
   pinMode(LED_PIN, OUTPUT);
   pinMode(INA_M1, OUTPUT); pinMode(INB_M1, OUTPUT);
   pinMode(INA_M2, OUTPUT); pinMode(INB_M2, OUTPUT);
-  
+
   ledcAttach(EN_M1, PWM_FREQ, PWM_RES);
   ledcAttach(EN_M2, PWM_FREQ, PWM_RES);
-  
+
   digitalWrite(INA_M1, LOW); digitalWrite(INB_M1, LOW); ledcWrite(EN_M1, 0);
   digitalWrite(INA_M2, LOW); digitalWrite(INB_M2, LOW); ledcWrite(EN_M2, 0);
 
@@ -127,9 +128,9 @@ void Task_Control(void *pvParameters) {
       ledcWrite(EN_M1, 0); ledcWrite(EN_M2, 0);
       digitalWrite(INA_M1, LOW); digitalWrite(INB_M1, LOW);
       digitalWrite(INA_M2, LOW); digitalWrite(INB_M2, LOW);
-      digitalWrite(LED_PIN, LOW); 
+      digitalWrite(LED_PIN, LOW);
       Serial0.println("[WATCHDOG] Sem sinal do ROS ou Wi-Fi! Motores desligados.");
-    } 
+    }
     else {
       // 3. MATRIZ DE CALIBRAÇÃO E PWM
       digitalWrite(LED_PIN, (v_local == 0 && w_local == 0) ? LOW : HIGH);
@@ -143,16 +144,16 @@ void Task_Control(void *pvParameters) {
       int pwm_left = calculate_pwm_with_deadband(v_left);
       int pwm_right = calculate_pwm_with_deadband(v_right);
 
-      if (v_left > 0) { digitalWrite(INA_M1, HIGH); digitalWrite(INB_M1, LOW); } 
-      else if (v_left < 0) { digitalWrite(INA_M1, LOW); digitalWrite(INB_M1, HIGH); } 
+      if (v_left > 0) { digitalWrite(INA_M1, HIGH); digitalWrite(INB_M1, LOW); }
+      else if (v_left < 0) { digitalWrite(INA_M1, LOW); digitalWrite(INB_M1, HIGH); }
       else { digitalWrite(INA_M1, LOW); digitalWrite(INB_M1, LOW); }
       ledcWrite(EN_M1, pwm_left);
 
-      if (v_right > 0) { digitalWrite(INA_M2, HIGH); digitalWrite(INB_M2, LOW); } 
-      else if (v_right < 0) { digitalWrite(INA_M2, LOW); digitalWrite(INB_M2, HIGH); } 
+      if (v_right > 0) { digitalWrite(INA_M2, HIGH); digitalWrite(INB_M2, LOW); }
+      else if (v_right < 0) { digitalWrite(INA_M2, LOW); digitalWrite(INB_M2, HIGH); }
       else { digitalWrite(INA_M2, LOW); digitalWrite(INB_M2, LOW); }
       ledcWrite(EN_M2, pwm_right);
-      
+
       if(v_local != 0 || w_local != 0) {
         Serial0.printf("[MOTOR] V: %.2f | W: %.2f | PWM_E: %d | PWM_D: %d\n", v_local, w_local, pwm_left, pwm_right);
       }
@@ -189,99 +190,121 @@ const char* html_page = R"rawliteral(
 <body>
   <h2>Robô Esteira</h2>
   <div class="dpad">
-    <div class="btn up" onmousedown="cmd('F')" onmouseup="cmd('S')" ontouchstart="cmd('F')" ontouchend="cmd('S')">▲</div>
-    <div class="btn left" onmousedown="cmd('L')" onmouseup="cmd('S')" ontouchstart="cmd('L')" ontouchend="cmd('S')">◀</div>
+    <div class="btn up" onmousedown="cmd('F')" onmouseup="cmd('S')" ontouchstart="cmd('F')" ontouchend="cmd('S')">'▲'</div>
+    <div class="btn left" onmousedown="cmd('L')" onmouseup="cmd('S')" ontouchstart="cmd('L')" ontouchend="cmd('S')">'◀'</div>
     <div class="btn center" onclick="cmd('S')">STOP</div>
-    <div class="btn right" onmousedown="cmd('R')" onmouseup="cmd('S')" ontouchstart="cmd('R')" ontouchend="cmd('S')">▶</div>
-    <div class="btn down" onmousedown="cmd('B')" onmouseup="cmd('S')" ontouchstart="cmd('B')" ontouchend="cmd('S')">▼</div>
-  </div>
-  <div class="slider-container">
+    <div class="btn right" onmousedown="cmd('R')" onmouseup="cmd('S')" ontouchstart="cmd('R')" ontouchend="cmd('S')">'▶'</div>
+    <div class="btn down" onmousedown="cmd('B')" onmouseup="cmd('S')" ontouchstart="cmd('B')" ontouchend="cmd('S')">'▼'</div>
+    </div>
+    <div class="slider-container">
     <label>Velocidade Máxima: <span id="spd_val">50</span>%</label>
     <br><br>
     <input type="range" id="speed" min="10" max="100" value="50" oninput="document.getElementById('spd_val').innerText = this.value">
-  </div>
-  <script>
+    </div>
+    <script>
+    var timer;
+
     function cmd(dir) {
-      var s = document.getElementById('speed').value / 100.0; 
-      fetch('/acao?dir=' + dir + '&v=' + s); 
+      // Limpa qualquer loop anterior para não acumular
+      clearInterval(timer);
+
+      if (dir === 'S') {
+        // Se for STOP, envia uma vez e para o loop
+        enviar(dir);
+      } else {
+        // Se estiver segurando um botão, envia a cada 100ms (10Hz)
+        // Isso mantém o Watchdog do ESP32 sempre alimentado
+        timer = setInterval(function() {
+          enviar(dir);
+        }, 100);
+      }
     }
-  </script>
-</body>
-</html>
-)rawliteral";
 
-void Task_WebServer(void *pvParameters) {
-  WiFi.softAP("Robo_Esteira", "12345678"); 
-  IPAddress IP = WiFi.softAPIP();
-  Serial0.print(">> [WEB] Wi-Fi Iniciado! Conecte no IP: ");
-  Serial0.println(IP);
-
-  server.on("/", HTTP_GET, []() {
-    server.send(200, "text/html", html_page);
-  });
-
-  server.on("/acao", HTTP_GET, []() {
-    String dir = server.arg("dir");
-    float speed = server.arg("v").toFloat(); 
-    
-    float target_v = 0.0, target_w = 0.0;
-    if (dir == "F") target_v = speed;
-    else if (dir == "B") target_v = -speed;
-    else if (dir == "L") target_w = speed;
-    else if (dir == "R") target_w = -speed;
-
-    if (xSemaphoreTake(xMutexData, pdMS_TO_TICKS(5)) == pdTRUE) {
-      sharedCmd.v = target_v;
-      sharedCmd.w = target_w;
-      sharedCmd.last_update = millis();
-      xSemaphoreGive(xMutexData);
+    function enviar(dir) {
+      var s = document.getElementById('speed').value / 100.0;
+      fetch('/acao?dir=' + dir + '&v=' + s);
     }
-    server.send(200, "text/plain", "OK");
-  });
 
-  server.begin();
-  while (1) {
-    server.handleClient();
-    vTaskDelay(pdMS_TO_TICKS(20));
+    // Segurança extra: se o mouse sair do botão ou o toque terminar, para o loop
+    document.addEventListener("mouseup", () => clearInterval(timer));
+    document.addEventListener("touchend", () => clearInterval(timer));
+    </script>
+    </body>
+    </html>
+    )rawliteral";
+
+  void Task_WebServer(void *pvParameters) {
+    WiFi.softAP("Robo_Esteira", "12345678");
+    IPAddress IP = WiFi.softAPIP();
+    Serial0.print(">> [WEB] Wi-Fi Iniciado! Conecte no IP: ");
+    Serial0.println(IP);
+
+    server.on("/", HTTP_GET, []() {
+      server.send(200, "text/html", html_page);
+    });
+
+    server.on("/acao", HTTP_GET, []() {
+      String dir = server.arg("dir");
+      float speed = server.arg("v").toFloat();
+
+      float target_v = 0.0, target_w = 0.0;
+      if (dir == "F") target_v = speed;
+      else if (dir == "B") target_v = -speed;
+      else if (dir == "L") target_w = speed;
+      else if (dir == "R") target_w = -speed;
+
+      if (xSemaphoreTake(xMutexData, pdMS_TO_TICKS(5)) == pdTRUE) {
+        sharedCmd.v = target_v;
+        sharedCmd.w = target_w;
+        sharedCmd.last_update = millis();
+        xSemaphoreGive(xMutexData);
+      }
+      server.send(200, "text/plain", "OK");
+    });
+
+    server.begin();
+    while (1) {
+      server.handleClient();
+      vTaskDelay(pdMS_TO_TICKS(20));
+    }
   }
-}
 
-// ==========================================
-// TAREFA 3: Comunicação micro-ROS (Core 0 / Nativa)
-// ==========================================
-void Task_MicroROS(void *pvParameters) {
-  set_microros_transports();
-  vTaskDelay(pdMS_TO_TICKS(2000));
+  // ==========================================
+  // TAREFA 3: Comunicação micro-ROS (Core 0 / Nativa)
+  // ==========================================
+  void Task_MicroROS(void *pvParameters) {
+    set_microros_transports();
+    vTaskDelay(pdMS_TO_TICKS(2000));
 
-  allocator = rcl_get_default_allocator();
-  RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));
-  RCCHECK(rclc_node_init_default(&node, "micro_ros_arduino_node", "", &support));
-  RCCHECK(rclc_subscription_init_default(&subscriber, &node, ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist), "cmd_vel"));
-  RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
-  RCCHECK(rclc_executor_add_subscription(&executor, &subscriber, &msg, &subscription_callback, ON_NEW_DATA));
+    allocator = rcl_get_default_allocator();
+    RCCHECK(rclc_support_init(&support, 0, NULL, &allocator));
+    RCCHECK(rclc_node_init_default(&node, "micro_ros_arduino_node", "", &support));
+    RCCHECK(rclc_subscription_init_default(&subscriber, &node, ROSIDL_GET_MSG_TYPE_SUPPORT(geometry_msgs, msg, Twist), "cmd_vel"));
+    RCCHECK(rclc_executor_init(&executor, &support.context, 1, &allocator));
+    RCCHECK(rclc_executor_add_subscription(&executor, &subscriber, &msg, &subscription_callback, ON_NEW_DATA));
 
-  while (1) {
-    rclc_executor_spin_some(&executor, RCL_MS_TO_NS(10));
-    vTaskDelay(pdMS_TO_TICKS(10)); 
+    while (1) {
+      rclc_executor_spin_some(&executor, RCL_MS_TO_NS(10));
+      vTaskDelay(pdMS_TO_TICKS(10));
+    }
   }
-}
 
-// ==========================================
-// SETUP INICIAL
-// ==========================================
-void setup() {
-  xMutexData = xSemaphoreCreateMutex();
-  
-  if (xMutexData != NULL) {
-    // Hardware físico e Watchdog garantidos no Core 1
-    xTaskCreatePinnedToCore(Task_Control, "Controle_HW", 4096, NULL, 2, NULL, 1);
-    
-    // Comunicações de Rede rodam no Core 0
-    xTaskCreatePinnedToCore(Task_MicroROS, "Micro_ROS", 8192, NULL, 1, NULL, 0);
-    xTaskCreatePinnedToCore(Task_WebServer, "Web_Server", 4096, NULL, 1, NULL, 0);
+  // ==========================================
+  // SETUP INICIAL
+  // ==========================================
+  void setup() {
+    xMutexData = xSemaphoreCreateMutex();
+
+    if (xMutexData != NULL) {
+      // Hardware físico e Watchdog garantidos no Core 1
+      xTaskCreatePinnedToCore(Task_Control, "Controle_HW", 4096, NULL, 2, NULL, 1);
+
+      // Comunicações de Rede rodam no Core 0
+      xTaskCreatePinnedToCore(Task_MicroROS, "Micro_ROS", 8192, NULL, 1, NULL, 0);
+      xTaskCreatePinnedToCore(Task_WebServer, "Web_Server", 4096, NULL, 1, NULL, 0);
+    }
   }
-}
 
-void loop() {
-  vTaskDelete(NULL); 
-}
+  void loop() {
+    vTaskDelete(NULL);
+  }
