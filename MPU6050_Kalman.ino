@@ -73,7 +73,7 @@ void loop() {
   // 2. Aplica o filtro de Kalman e converte para graus/s
   float filtrado = kalman(g.gyro.z);
   float gyroZ_deg = g.gyro.z * (180.0 / PI);
-  float zfiltrado = (filtrado * (180.0 / PI)) + 1.40;
+  float zfiltrado = (filtrado * (180.0 / PI)) + 1.39757553339;
 
   // 3. Integração para encontrar o Yaw em graus
   // Ignora ruídos muito pequenos perto do zero (opcional, mas recomendado)
