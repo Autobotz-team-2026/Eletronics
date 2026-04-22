@@ -242,6 +242,9 @@ void Task_WebServer(void *pvParameters) {
   // 1. Configura como "Estação" (Cliente) e conecta na sua rede
   WiFi.mode(WIFI_STA);
   WiFi.begin("LucianoCL", "calculosola");
+
+  // ADICIONE ESTA LINHA: Desliga a economia de energia
+  WiFi.setSleep(false);
   
   Serial0.print(">> [WEB] Conectando ao Wi-Fi LucianoCL...");
 
@@ -322,7 +325,7 @@ void Task_WebServer(void *pvParameters) {
       xTaskCreatePinnedToCore(Task_Control, "Controle_HW", 4096, NULL, 2, NULL, 1);
 
       // Comunicações de Rede rodam no Core 0
-      xTaskCreatePinnedToCore(Task_MicroROS, "Micro_ROS", 8192, NULL, 1, NULL, 0);
+     // xTaskCreatePinnedToCore(Task_MicroROS, "Micro_ROS", 8192, NULL, 1, NULL, 0);
       xTaskCreatePinnedToCore(Task_WebServer, "Web_Server", 4096, NULL, 1, NULL, 0);
     }
   }
