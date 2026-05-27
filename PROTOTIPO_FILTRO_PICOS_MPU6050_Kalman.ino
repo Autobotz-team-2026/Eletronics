@@ -2,6 +2,24 @@
 #include <Adafruit_MPU6050.h>
 #include <Adafruit_Sensor.h>
 
+
+
+/*===================================================
+este codigo aplica uma maneira semelhante a deadzone
+nos testes realizados, mesmo com esse deadzone de 0.8
+a mpu respondeu bem, variações rápidas de 0 a 90 não 
+houve perda de ângulo
+=====================================================*/
+
+/*====================================================
+dos 3 códigos neste repositório para a mpu6050, este é
+o que apresenta uma maior estabilidade do valor quando 
+a mpu é deixada parada. Porém, é necessário testar e 
+ver se a funcionalidade adicionada para filtragem afeta
+negativamente o movimento do robô
+======================================================*/
+
+
 Adafruit_MPU6050 mpu;
 
 // Definição dos pinos I2C personalizados para a ESP32-S3
