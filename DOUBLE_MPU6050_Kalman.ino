@@ -4,13 +4,10 @@
 
 Adafruit_MPU6050 mpu;
 
-
-
 /*==========================================================================
 Este código apresentou uma resposta melhor com o decorrer do tempo em relação
-ao código com float
+ao código com float - Atualizado para padronizar as unidades de medida (Graus/s)
 ============================================================================*/
-
 
 // Definição dos pinos I2C personalizados para a ESP32-S3
 #define SDA_PIN 8
@@ -26,7 +23,7 @@ double gyroZ_offset = 0.0;
 
 // Filtro de Kalman agora trabalha 100% com 64 bits de precisão
 double kalman(double input) {
-  static double Q = 0.05;      // Ajustado (era 0.05) para responder bem a movimentos rápidos
+  static double Q = 0.5;      // Ajustado (era 0.05) para responder bem a movimentos rápidos
   static double R = 10.0;      // Reduzido (era 10.0) para evitar o "atraso" de não chegar aos 90º
   static double x_est = 0.0;  // estado estimado atual
   static double P = 1.0;      // estimativa inicial de erro
@@ -85,7 +82,7 @@ void setup() {
   }
   
   // 3. Média exata do erro do giroscópio + SEU AJUSTE FINO TÉRMICO
-  gyroZ_offset = (soma / (double)totalAmostras) + 0.004455;
+  gyroZ_offset = (soma / (double)totalAmostras);
   
   Serial.print("Calibracao Concluida! Novo Offset (com ajuste): ");
   Serial.println(gyroZ_offset, 6);
@@ -104,21 +101,25 @@ void loop() {
   double dt = (double)(tempoAtual - tempoAnterior) / 1000000.0; 
   tempoAnterior = tempoAtual;
 
-  // 2. Aplica o filtro de Kalman 100% em double
-  double filtrado = kalman((double)g.gyro.z);
-  
-  // 3. Converte para graus/s usando M_PI e subtrai o Offset calibrado
-  double zfiltrado = (filtrado * (180.0 / M_PI)) - gyroZ_offset;
+  // 2. Converte a leitura bruta (rad/s) para graus/s PRIMEIRO
+  double gyroZ_bruto_deg = (double)g.gyro.z * (180.0 / M_PI);
 
-  // 4. Integração de alta precisão para encontrar o Yaw em graus
+  // 3. Subtrai o offset (agora ambos estão na mesma escala: graus/s)
+  double gyroz_corrigido = gyroZ_bruto_deg - gyroZ_offset;
+
+  // 4. Aplica o filtro de Kalman 
+  double zfiltrado = kalman(gyroz_corrigido);
+
+  // 5. Integração de alta precisão para encontrar o Yaw em graus
   yaw = yaw + (zfiltrado * dt);
-
-  // --- FORMATO PARA O SERIAL PLOTTER ---
-  // Serial.print("Vel_Z_Filtrada:");
-  // Serial.println(zfiltrado, 4); 
-
-  // O Serial continuará imprimindo com 2 casas decimais visualmente, 
-  // mas o 'yaw' interno agora roda com o máximo da precisão computacional
-  Serial.print("Yaw_Angulo:");
+  
+  // Imprime o bruto em GRAUS para você poder comparar lado a lado com o corrigido
+  Serial.print("YAW:");
   Serial.println(yaw, 2); 
+  
+  // O valor corrigido agora deve oscilar muito próximo a zero quando a placa estiver parada
+  //Serial.print("Corrigido_Deg:");
+ // Serial.println(gyroz_corrigido, 2);
+  
+  delay(10);
 }
