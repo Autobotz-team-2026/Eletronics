@@ -1,0 +1,91 @@
+#include <Wire.h>
+#include "ICM_20948.h"
+
+#define SDA_PIN 8 
+#define SCL_PIN 46
+#define AD0_VAL 0 
+
+ICM_20948_I2C myICM;
+
+void setup() {
+  Serial.begin(115200);
+  while (!Serial);
+
+  Wire.begin(SDA_PIN, SCL_PIN);
+  Wire.setClock(400000); 
+
+  bool connected = false;
+  while (!connected) {
+    myICM.begin(Wire, AD0_VAL);
+    if (myICM.status != ICM_20948_Stat_Ok) {
+      Serial.println("Procurando o sensor no I2C...");
+      delay(500);
+    } else {
+      connected = true;
+    }
+  }
+  
+  Serial.println("\n==========================================");
+  Serial.println("   FERRAMENTA DE CALIBRAÇÃO DO ICM-20948  ");
+  Serial.println("==========================================");
+  Serial.println("A calibração vai começar em 5 segundos...");
+  Serial.println("Afaste-se de metais e prepare-se para girar o sensor em formato de '8'.");
+  delay(5000);
+  
+  Serial.println("\nCOLETANDO DADOS (15 segundos)... GIRE O SENSOR AGORA!");
+  
+  float mag_min[3] = {32767, 32767, 32767};
+  float mag_max[3] = {-32768, -32768, -32768};
+  
+  unsigned long tempo_calibracao = millis();
+  
+  while(millis() - tempo_calibracao < 15000) {
+    if (myICM.dataReady()) {
+      myICM.getAGMT();
+      
+      float mx = myICM.magX();
+      float my = myICM.magY();
+      float mz = myICM.magZ();
+      
+      if (mx < mag_min[0]) mag_min[0] = mx;
+      if (my < mag_min[1]) mag_min[1] = my;
+      if (mz < mag_min[2]) mag_min[2] = mz;
+      
+      if (mx > mag_max[0]) mag_max[0] = mx;
+      if (my > mag_max[1]) mag_max[1] = my;
+      if (mz > mag_max[2]) mag_max[2] = mz;
+    }
+  }
+
+  // Cálculos do Hard Iron (Bias)
+  float mag_bias_x = (mag_max[0] + mag_min[0]) / 2.0;
+  float mag_bias_y = (mag_max[1] + mag_min[1]) / 2.0;
+  float mag_bias_z = (mag_max[2] + mag_min[2]) / 2.0;
+
+  // Cálculos do Soft Iron (Scale)
+  float cord_x = (mag_max[0] - mag_min[0]) / 2.0;
+  float cord_y = (mag_max[1] - mag_min[1]) / 2.0;
+  float cord_z = (mag_max[2] - mag_min[2]) / 2.0;
+  float avg_rad = (cord_x + cord_y + cord_z) / 3.0;
+
+  float mag_scale_x = avg_rad / cord_x;
+  float mag_scale_y = avg_rad / cord_y;
+  float mag_scale_z = avg_rad / cord_z;
+
+  Serial.println("\n=== CALIBRAÇÃO CONCLUÍDA! ===");
+  Serial.println("Copie as 6 linhas abaixo e substitua no começo do seu código principal:\n");
+  
+  Serial.print("float mag_bias_x = "); Serial.print(mag_bias_x, 4); Serial.println(";");
+  Serial.print("float mag_bias_y = "); Serial.print(mag_bias_y, 4); Serial.println(";");
+  Serial.print("float mag_bias_z = "); Serial.print(mag_bias_z, 4); Serial.println(";");
+  
+  Serial.print("float mag_scale_x = "); Serial.print(mag_scale_x, 4); Serial.println(";");
+  Serial.print("float mag_scale_y = "); Serial.print(mag_scale_y, 4); Serial.println(";");
+  Serial.print("float mag_scale_z = "); Serial.print(mag_scale_z, 4); Serial.println(";\n");
+  
+  Serial.println("Você pode fechar este código agora.");
+}
+
+void loop() {
+  // Não fazemos nada no loop. A calibração roda apenas uma vez no setup.
+}
